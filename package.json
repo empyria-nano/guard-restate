@@ -1,0 +1,44 @@
+{
+	"name": "@principia/restate",
+	"version": "0.1.0",
+	"description": "Restate.dev helpers for the Principia nanoservice framework",
+	"license": "MIT",
+	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/imrefazekas/principia-guard-restate.git"
+	},
+	"type": "module",
+	"main": "./index.js",
+	"exports": {
+		".": "./index.js",
+		"./lib/*": "./lib/*.js",
+		"./package.json": "./package.json"
+	},
+	"scripts": {
+		"format": "bun oxfmt --check",
+		"format:fix": "bun oxfmt",
+		"lint": "bun oxlint",
+		"lint:fix": "bun oxlint --fix",
+		"test": "bun test --coverage",
+		"test:watch": "bun test --watch"
+	},
+	"dependencies": {
+		"@principia/classification": "git@github.com:imrefazekas/principia-classification.git",
+		"@principia/common": "git@github.com:imrefazekas/principia-common.git",
+		"@restatedev/restate-sdk": "1.6.1",
+		"@restatedev/restate-sdk-clients": "1.6.1",
+		"@restatedev/restate-sdk-core": "1.6.1",
+		"croner": "10.0.1"
+	},
+	"devDependencies": {
+		"@restatedev/restate-server": "1.7.3",
+		"oxfmt": "0.63.0",
+		"oxlint": "1.78.0"
+	},
+	"engines": {
+		"bun": ">=1.4.0",
+		"node": ">=26"
+	},
+	"packageManager": "bun@1.4.0"
+}
