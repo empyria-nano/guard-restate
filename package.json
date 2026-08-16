@@ -1,12 +1,12 @@
 {
-	"name": "@principia/restate",
+	"name": "@empyria/restate",
 	"version": "0.1.0",
 	"description": "Restate.dev helpers for the Principia nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/imrefazekas/principia-guard-restate.git"
+		"url": "git+https://github.com/imrefazekas/empyria-guard-restate.git"
 	},
 	"type": "module",
 	"main": "./index.js",
@@ -24,11 +24,11 @@
 		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
-		"@principia/classification": "git@github.com:imrefazekas/principia-classification.git",
-		"@principia/common": "git@github.com:imrefazekas/principia-common.git",
-		"@restatedev/restate-sdk": "1.6.1",
-		"@restatedev/restate-sdk-clients": "1.6.1",
-		"@restatedev/restate-sdk-core": "1.6.1",
+		"@empyria/classification": "0.1.0",
+		"@empyria/common": "0.1.0",
+		"@restatedev/restate-sdk": "1.16.6",
+		"@restatedev/restate-sdk-clients": "1.16.6",
+		"@restatedev/restate-sdk-core": "1.16.6",
 		"croner": "10.0.1"
 	},
 	"devDependencies": {

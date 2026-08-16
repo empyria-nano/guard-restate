@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test'
 import { withValidation } from '../lib/Validation.js'
-import { PrincipiaError } from '@principia/common'
+import { PrincipiaError } from '@empyria/common'
 
 const inputSchema = {
 	type: 'object',

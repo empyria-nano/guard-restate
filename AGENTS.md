@@ -11,8 +11,8 @@ is not the right default here.
 
 ## Runtime
 
-- Requires Bun `>=1.4.0` or Node.js `>=26`, inherited from `@principia/classification`'s use
-  of native `Temporal`. Both `@principia/classification` and `@principia/common` are **git
+- Requires Bun `>=1.4.0` or Node.js `>=26`, inherited from `@empyria/classification`'s use
+  of native `Temporal`. Both `@empyria/classification` and `@empyria/common` are **git
   dependencies** — this package only sees their pushed commits, not local working-tree changes
   in sibling repos.
 - Plain ESM, no TypeScript, no build step. The original `admin.ts`/`admin.types.ts`/`Caller.ts`
