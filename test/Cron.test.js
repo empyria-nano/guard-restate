@@ -4,11 +4,11 @@ import { TerminalError } from '@restatedev/restate-sdk'
 
 describe('setJobStateName', () => {
 	test('returns the name it was given', () => {
-		expect(setJobStateName('principia-job-state')).toBe('principia-job-state')
+		expect(setJobStateName('empyria-job-state')).toBe('empyria-job-state')
 	})
 
-	test('defaults to "principia-job-state"', () => {
-		expect(JOB_STATE_NAME).toBe('principia-job-state')
+	test('defaults to "empyria-job-state"', () => {
+		expect(JOB_STATE_NAME).toBe('empyria-job-state')
 	})
 })
 

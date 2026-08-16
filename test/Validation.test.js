@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test'
 import { withValidation } from '../lib/Validation.js'
-import { PrincipiaError } from '@empyria/common'
+import { EmpyriaError } from '@empyria/common'
 
 const inputSchema = {
 	type: 'object',
@@ -24,11 +24,11 @@ describe('withValidation', () => {
 
 	test('throws when the input does not match the schema', async () => {
 		const handler = withValidation(inputSchema, outputSchema, async () => ({ greeting: 'hi' }))
-		await expect(handler({}, {})).rejects.toThrow(PrincipiaError)
+		await expect(handler({}, {})).rejects.toThrow(EmpyriaError)
 	})
 
 	test('throws when the handler output does not match the schema', async () => {
 		const handler = withValidation(inputSchema, outputSchema, async () => ({ wrong: true }))
-		await expect(handler({}, { name: 'Bob' })).rejects.toThrow(PrincipiaError)
+		await expect(handler({}, { name: 'Bob' })).rejects.toThrow(EmpyriaError)
 	})
 })

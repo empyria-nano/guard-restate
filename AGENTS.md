@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Restate.dev helpers for **Principia**, a nanoservice framework built primarily on Bun:
+Restate.dev helpers for **Empyria**, a nanoservice framework built primarily on Bun:
 an Admin API client, a dynamic-dispatch service, cron-driven workflow scheduling, and
 schema validation for workflow handlers.
 

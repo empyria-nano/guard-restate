@@ -1,7 +1,7 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.1.0",
-	"description": "Restate.dev helpers for the Principia nanoservice framework",
+	"version": "0.1.1",
+	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
 	"repository": {
@@ -24,8 +24,8 @@
 		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
-		"@empyria/classification": "0.1.0",
-		"@empyria/common": "0.1.0",
+		"@empyria/classification": "0.1.1",
+		"@empyria/common": "0.1.1",
 		"@restatedev/restate-sdk": "1.16.6",
 		"@restatedev/restate-sdk-clients": "1.16.6",
 		"@restatedev/restate-sdk-core": "1.16.6",

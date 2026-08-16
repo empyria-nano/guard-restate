@@ -1,6 +1,6 @@
 # @empyria/restate
 
-[Restate.dev](https://restate.dev) helpers for **Principia**, a nanoservice framework built
+[Restate.dev](https://restate.dev) helpers for **Empyria**, a nanoservice framework built
 primarily on Bun: an Admin API client, a generic dynamic-dispatch service, cron-driven
 workflow scheduling, and Restate-aware input/output schema validation.
 
