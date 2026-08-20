@@ -1,12 +1,12 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/imrefazekas/empyria-guard-restate.git"
+		"url": "git+https://github.com/empyria-nano/guard-restate.git"
 	},
 	"type": "module",
 	"main": "./index.js",
@@ -24,17 +24,17 @@
 		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
-		"@empyria/classification": "0.1.1",
-		"@empyria/common": "0.1.1",
-		"@restatedev/restate-sdk": "1.16.6",
-		"@restatedev/restate-sdk-clients": "1.16.6",
-		"@restatedev/restate-sdk-core": "1.16.6",
+		"@empyria/classification": "0.1.2",
+		"@empyria/common": "0.1.2",
+		"@restatedev/restate-sdk": "1.16.7",
+		"@restatedev/restate-sdk-clients": "1.16.7",
+		"@restatedev/restate-sdk-core": "1.16.7",
 		"croner": "10.0.1"
 	},
 	"devDependencies": {
-		"@restatedev/restate-server": "1.7.3",
-		"oxfmt": "0.63.0",
-		"oxlint": "1.78.0"
+		"@restatedev/restate-server": "1.7.4",
+		"oxfmt": "0.64.0",
+		"oxlint": "1.79.0"
 	},
 	"engines": {
 		"bun": ">=1.4.0",
