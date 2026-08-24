@@ -1,6 +1,6 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
