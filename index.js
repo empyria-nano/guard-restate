@@ -5,3 +5,5 @@ export * from './lib/Cron.js'
 export * from './lib/Admin.js'
 
 export * from './lib/Caller.js'
+
+export * from './lib/Pubsub.js'

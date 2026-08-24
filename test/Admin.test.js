@@ -20,7 +20,6 @@ import {
 	defineWorkflow,
 	defineService,
 	defineObject,
-	definePubsub,
 	createRestateAdmin,
 	restate,
 	clients,
@@ -453,18 +452,6 @@ describe('defineWorkflow / defineService / defineObject', () => {
 
 		const obj = defineObject({ name: 'Obj', handlers: { do: async () => {} } })
 		expect(obj.name).toBe('Obj')
-	})
-})
-
-describe('definePubsub', () => {
-	test('is a passthrough to createPubsubObject, name and all', () => {
-		const pubsub = definePubsub('pubsub')
-		expect(pubsub.name).toBe('pubsub')
-	})
-
-	test('forwards options (e.g. pullTimeout) to createPubsubObject', () => {
-		const pubsub = definePubsub('pubsub', { pullTimeout: { seconds: 30 } })
-		expect(pubsub.name).toBe('pubsub')
 	})
 })
 
