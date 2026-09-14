@@ -136,6 +136,25 @@ describe('startSubWorkflow / callSubWorkflow', () => {
 		expect(calledArgs.key).toBe('wf-key-2')
 		expect(result).toEqual({ done: true })
 	})
+
+	// Both functions only need `ctx.genericSend`/`ctx.genericCall`, which the SDK declares on
+	// the base Context interface — every handler type has it, not just a workflow's own
+	// context. Named explicitly (not just "a ctx mock", like the two tests above already are)
+	// to document that calling these from a plain, unkeyed `restate.service` handler — e.g. to
+	// idempotently start a long-running workflow the moment that service first learns the
+	// workflow's key exists — is a supported, intended use, not an incidental side effect of
+	// duck typing.
+	test('startSubWorkflow works from a plain (non-workflow) service context', () => {
+		let sentArgs
+		/** @type {import('@restatedev/restate-sdk').Context} */
+		const plainServiceCtx = { genericSend: (args) => (sentArgs = args) ?? 'handle' }
+		startSubWorkflow(plainServiceCtx, 'CorporateActionWorkflow', 'CA08841DVCA26', {
+			triggeredBy: 'swift-upstream-sort',
+		})
+		expect(sentArgs.service).toBe('CorporateActionWorkflow')
+		expect(sentArgs.method).toBe('run')
+		expect(sentArgs.key).toBe('CA08841DVCA26')
+	})
 })
 
 describe('listServices', () => {
