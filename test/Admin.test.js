@@ -4,6 +4,7 @@ import {
 	startSubWorkflow,
 	callSubWorkflow,
 	listServices,
+	queryRestate,
 	deleteDeployment,
 	service,
 	listHandlers,
@@ -170,6 +171,27 @@ describe('listServices', () => {
 		await expect(listServices({ restateAdminURL: 'http://admin' })).rejects.toThrow(
 			restate.TerminalError,
 		)
+	})
+})
+
+describe('queryRestate', () => {
+	test('POSTs {query: sql} to /query and returns the rows', async () => {
+		const rows = [{ target_service_key: 'CA0001', status: 'suspended' }]
+		globalThis.fetch = mock(async (url, init) => {
+			expect(String(url)).toBe('http://admin/query')
+			expect(JSON.parse(init.body)).toEqual({ query: 'SELECT 1' })
+			return jsonResponse({ rows })
+		})
+		expect(await queryRestate({ restateAdminURL: 'http://admin', sql: 'SELECT 1' })).toEqual(
+			rows,
+		)
+	})
+
+	test('throws a TerminalError on a failed query', async () => {
+		globalThis.fetch = mock(async () => jsonResponse(null, false))
+		await expect(
+			queryRestate({ restateAdminURL: 'http://admin', sql: 'SELECT 1' }),
+		).rejects.toThrow(restate.TerminalError)
 	})
 })
 
@@ -485,5 +507,19 @@ describe('createRestateAdmin', () => {
 			restateURL: 'http://ingress',
 		})
 		expect(await admin.listServices()).toEqual(servicesPayload.services)
+	})
+
+	test('query() binds restateAdminURL and forwards the raw SQL', async () => {
+		const rows = [{ status: 'completed' }]
+		globalThis.fetch = mock(async (url, init) => {
+			expect(String(url)).toBe('http://admin/query')
+			expect(JSON.parse(init.body)).toEqual({ query: 'SELECT status FROM sys_invocation' })
+			return jsonResponse({ rows })
+		})
+		const admin = createRestateAdmin({
+			restateAdminURL: 'http://admin',
+			restateURL: 'http://ingress',
+		})
+		expect(await admin.query('SELECT status FROM sys_invocation')).toEqual(rows)
 	})
 })
