@@ -3,6 +3,8 @@ import {
 	checkServiceHandler,
 	startSubWorkflow,
 	callSubWorkflow,
+	childKey,
+	CHILD_KEY_SEPARATOR,
 	listServices,
 	queryRestate,
 	deleteDeployment,
@@ -110,6 +112,32 @@ describe('checkServiceHandler', () => {
 		await expect(checkServiceHandler('http://admin', 'UnfetchableSvc', 'run')).rejects.toThrow(
 			restate.TerminalError,
 		)
+	})
+})
+
+describe('childKey', () => {
+	test('joins parent key and node path', () => {
+		expect(childKey('order-42', 'approval')).toBe('order-42:approval')
+		expect(CHILD_KEY_SEPARATOR).toBe(':')
+	})
+
+	test('appends the iteration when given, including 0', () => {
+		expect(childKey('order-42', 'shipment', 3)).toBe('order-42:shipment:3')
+		expect(childKey('order-42', 'shipment', 0)).toBe('order-42:shipment:0')
+	})
+
+	test('nests: a grandchild key extends the child key', () => {
+		expect(childKey(childKey('order-42', 'approval'), 'review', 1)).toBe(
+			'order-42:approval:review:1',
+		)
+	})
+
+	test('rejects empty or separator-containing segments and an empty parent', () => {
+		expect(() => childKey('order-42', '')).toThrow(TypeError)
+		expect(() => childKey('order-42', 'a:b')).toThrow(TypeError)
+		expect(() => childKey('order-42', 'a/b')).toThrow(TypeError)
+		expect(() => childKey('order-42', 'step', '')).toThrow(TypeError)
+		expect(() => childKey('', 'step')).toThrow(TypeError)
 	})
 })
 
@@ -389,6 +417,23 @@ describe('sendMessage / sendMessageAsync', () => {
 		).rejects.toThrow()
 	})
 
+	test('sends the idempotency-key header only when idempotencyKey is given', async () => {
+		const seen = []
+		globalThis.fetch = mock(async (url, init) => {
+			seen.push(init.headers)
+			return String(url).endsWith('/send')
+				? jsonResponse({ invocationId: 'inv-3', status: 'PreviouslyAccepted' })
+				: { ok: true, text: async () => '' }
+		})
+		const base = { restateURL: 'http://ingress', name: 'Svc', message: 'do', payload: {} }
+		await sendMessage({ ...base, idempotencyKey: 'req-1' })
+		await sendMessageAsync({ ...base, idempotencyKey: 'req-2' })
+		await sendMessage(base)
+		expect(seen[0]['idempotency-key']).toBe('req-1')
+		expect(seen[1]['idempotency-key']).toBe('req-2')
+		expect(seen[2]).not.toHaveProperty('idempotency-key')
+	})
+
 	test('sendMessageWithDiscovery / sendMessageAsyncWithDiscovery validate first', async () => {
 		globalThis.fetch = mock(async (url) => {
 			if (String(url).endsWith('/services')) return jsonResponse(servicesPayload)
@@ -521,5 +566,20 @@ describe('createRestateAdmin', () => {
 			restateURL: 'http://ingress',
 		})
 		expect(await admin.query('SELECT status FROM sys_invocation')).toEqual(rows)
+	})
+	test('sendMessage/sendMessageAsync forward idempotencyKey', async () => {
+		const seen = []
+		globalThis.fetch = mock(async (url, init) => {
+			seen.push(init.headers['idempotency-key'])
+			return jsonResponse({ invocationId: 'inv-4', status: 'Accepted' })
+		})
+		const admin = createRestateAdmin({
+			restateAdminURL: 'http://admin',
+			restateURL: 'http://ingress',
+		})
+		const msg = { name: 'Svc', message: 'do', payload: {} }
+		await admin.sendMessage({ ...msg, idempotencyKey: 'a' })
+		await admin.sendMessageAsync({ ...msg, idempotencyKey: 'b' })
+		expect(seen).toEqual(['a', 'b'])
 	})
 })
