@@ -24,6 +24,18 @@ is not the right default here.
 - Relative imports must include explicit `.js` extensions — Bun tolerates missing ones, Node's
   ESM resolver doesn't.
 
+## Agent entry point (`lib/agent/`)
+
+`lib/agent/` (merged in from the former `@empyria/restate-llm`) is exported only through
+`@empyria/restate/agent` ([agent.js](./agent.js)), never from [index.js](./index.js). The AI
+SDK packages (`ai`, `@ai-sdk/*`) are **optional** peer dependencies (and devDependencies for
+the tests): a consumer that only uses Admin/Cron/Pubsub must be able to import the package
+root without them installed. Never import `lib/agent/` from a root-exported module.
+
+Agent tests use `test/agent/fakes.js`'s `fakeCtx`, which mimics the journal's JSON round trip
+and a bounded `ctx.run` turning an exhausted retry into a `TerminalError` — keep it in step
+with the real SDK behaviour when touching either.
+
 ## No official Admin API client
 
 Verified directly against the published `@restatedev/restate-sdk`/`-clients` package

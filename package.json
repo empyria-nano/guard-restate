@@ -1,6 +1,6 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.1.23",
+	"version": "0.2.0",
 	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
@@ -12,6 +12,7 @@
 	"main": "./index.js",
 	"exports": {
 		".": "./index.js",
+		"./agent": "./agent.js",
 		"./lib/*": "./lib/*.js",
 		"./package.json": "./package.json"
 	},
@@ -34,9 +35,28 @@
 		"croner": "10.0.1"
 	},
 	"devDependencies": {
+		"@ai-sdk/openai-compatible": "3.0.60",
+		"@ai-sdk/provider": "4.0.20",
 		"@restatedev/restate-server": "1.7.12",
+		"ai": "7.0.123",
 		"oxfmt": "0.71.0",
 		"oxlint": "1.86.0"
+	},
+	"peerDependencies": {
+		"@ai-sdk/openai-compatible": "^3.0.60",
+		"@ai-sdk/provider": "^4.0.20",
+		"ai": "^7.0.123"
+	},
+	"peerDependenciesMeta": {
+		"@ai-sdk/openai-compatible": {
+			"optional": true
+		},
+		"@ai-sdk/provider": {
+			"optional": true
+		},
+		"ai": {
+			"optional": true
+		}
 	},
 	"engines": {
 		"bun": ">=1.4.2",
