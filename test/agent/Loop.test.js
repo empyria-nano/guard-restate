@@ -171,3 +171,50 @@ describe('runAgentLoop', () => {
 		expect(JSON.stringify(result.messages)).not.toContain('EARLIER TURN')
 	})
 })
+
+describe('runAgentLoop: step metadata and trace', () => {
+	test('journals small per-step facts, returns a trace and logs one line per step', async () => {
+		const ctx = fakeCtx()
+		const model = new MockLanguageModelV4({
+			doGenerate: sequence(
+				toolCallResult([{ toolName: 'echo', input: { v: 'a' } }]),
+				textResult('done'),
+			),
+		})
+
+		const result = await runAgentLoop(ctx, {
+			model,
+			system: '',
+			prompt: 'go',
+			tools: { echo: echoTool },
+		})
+
+		const meta = ctx.steps[0].result.meta
+		expect(meta).toMatchObject({ model: 'mock-model-id', finishReason: 'tool-calls' })
+		expect(meta.durationMs).toBeGreaterThanOrEqual(0)
+		expect(result.trace).toHaveLength(2)
+		expect(result.trace[0]).toMatchObject({
+			step: 0,
+			tools: ['echo'],
+			finishReason: 'tool-calls',
+		})
+		expect(result.trace[1]).toMatchObject({ step: 1, tools: [], finishReason: 'stop' })
+		expect(ctx.logs).toHaveLength(2)
+		expect(ctx.logs[0]).toContain('llm-step-0')
+		expect(ctx.logs[0]).toContain('tools=[echo]')
+	})
+
+	test('the journaled meta carries no prompt or reply text', async () => {
+		const ctx = fakeCtx()
+		const model = new MockLanguageModelV4({ doGenerate: textResult('secret reply') })
+		await runAgentLoop(ctx, { model, system: 'secret system', prompt: 'secret prompt' })
+		const meta = JSON.stringify(ctx.steps[0].result.meta)
+		expect(meta).not.toContain('secret')
+	})
+
+	test('works with a context that has no console', async () => {
+		const ctx = { ...fakeCtx(), console: undefined }
+		const model = new MockLanguageModelV4({ doGenerate: textResult('hi') })
+		expect((await runAgentLoop(ctx, { model, system: '', prompt: 'x' })).text).toBe('hi')
+	})
+})

@@ -4,10 +4,9 @@ Restate.dev helpers for **Empyria**, a nanoservice framework built primarily on 
 an Admin API client, a dynamic-dispatch service, cron-driven workflow scheduling, and
 schema validation for workflow handlers.
 
-Targets Restate server `1.7.x` and `@restatedev/restate-sdk` `1.6.x` — check both when
-touching version pins; the SDK's own version numbering runs well ahead of the server's
-(e.g. `1.16.x` was latest on npm when `1.6.x` was what this repo targets), so "latest"
-is not the right default here.
+Targets Restate server `1.7.x` and `@restatedev/restate-sdk` `1.17.x` (pinned in `package.json`) —
+check both when touching version pins; the SDK's own version numbering runs well ahead of the
+server's, so "latest" is not the right default here.
 
 ## Runtime
 
@@ -32,14 +31,28 @@ SDK packages (`ai`, `@ai-sdk/*`) are **optional** peer dependencies (and devDepe
 the tests): a consumer that only uses Admin/Cron/Pubsub must be able to import the package
 root without them installed. Never import `lib/agent/` from a root-exported module.
 
-Agent tests use `test/agent/fakes.js`'s `fakeCtx`, which mimics the journal's JSON round trip
+Agent tests use `fakeCtx` from `lib/testing/Fakes.js` (exported as `@empyria/restate/testing`; `test/agent/fakes.js` re-exports it), which mimics the journal's JSON round trip
 and a bounded `ctx.run` turning an exhausted retry into a `TerminalError` — keep it in step
 with the real SDK behaviour when touching either.
+
+## Keep this package generic
+
+Only things that are generic to Restate or to LLM agents belong here. Anything specific to one
+consumer (its folder layout, its service names, its prompts, its UI) stays in that consumer. A consumer
+that finds itself writing a generic helper should add it here with tests, release it, then bump its pin.
+
+Journal discipline is enforced by the library, not left to each agent: step metadata is small numbers
+only (never prompt or reply text), and tool arguments/results have byte caps (`Tools.js`). Keep both
+true when touching `Loop.js` or `Tools.js`.
+
+`defineAgent`'s `tools` may be a function of the request; it is evaluated outside `ctx.run` on every
+replay, so it must stay pure. `test/agent/fakes.js`'s result helpers use the AI SDK's v4 result shape
+(`finishReason: {unified, raw}`); the older plain-string form makes `generateText` report no finish reason.
 
 ## No official Admin API client
 
 Verified directly against the published `@restatedev/restate-sdk`/`-clients` package
-internals (both the `1.6.x` line this repo targets and the latest available at the time):
+internals (both the line this repo targets and the latest available at the time):
 zero Admin API exports. Only the ingress/invocation client and the service-authoring API
 (`restate.service`/`object`/`workflow`) are official. `lib/Admin.js` fetches the Admin API's
 REST endpoints directly — that's not a stopgap, it's the only way to do this today.

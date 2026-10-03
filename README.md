@@ -4,7 +4,7 @@
 primarily on Bun: an Admin API client, a generic dynamic-dispatch service, cron-driven
 workflow scheduling, and Restate-aware input/output schema validation.
 
-Targets Restate server `1.7.x` and `@restatedev/restate-sdk` `1.6.x`.
+Targets Restate server `1.7.x` and `@restatedev/restate-sdk` `1.17.x`.
 
 ## Requirements
 
@@ -105,6 +105,34 @@ export const triage = defineAgent({
 | [lib/agent/Skills.js](./lib/agent/Skills.js) | Skill bodies stay out of the journal: `load_skill` records `{name, sha256}`, and `expandSkillRefs` puts the body back inside each LLM step. A hash mismatch within one invocation is terminal; across session turns the current body is used.                                                               |
 | [lib/agent/Errors.js](./lib/agent/Errors.js) | `toRestateLLMError` (AI SDK error → terminal / `RetryableError` / transient) and the default retry policies for LLM steps, tool steps and the agent invocation.                                                                                                                                             |
 | [lib/agent/Model.js](./lib/agent/Model.js)   | `createModel` — AI SDK model for an OpenAI-compatible endpoint (e.g. Bifrost).                                                                                                                                                                                                                              |
+
+### Shaping an agent
+
+`defineAgent` options beyond the basics:
+
+| Option                   | Does                                                                                                                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tools` as a function    | `tools: (input) => ({...})` builds the tools from the validated request, for tools that depend on it. It runs outside any `ctx.run` on every execution and replay, so it must be pure. An invalid map fails that request terminally (500). |
+| `respond(result, input)` | Shapes what `ask` returns from the loop result `{text, output?, steps, totalTokens, trace}`. Pair it with `responseSchema`, which validates the shaped value before Restate records it.                                                    |
+| `label(input)`           | A terminal failure then reads `[label] message`, so a failed run says what it was working on. Code and metadata are kept; cancellations, timeouts and retryable errors are untouched.                                                      |
+| `limits.maxInputBytes`   | Largest request (JSON bytes, default 64 KB); a larger one is refused terminally (413).                                                                                                                                                     |
+
+**Size caps on tool calls.** Tool arguments and results are journaled and replayed, so each tool has
+`maxInputBytes` (default 16 KB) and `maxOutputBytes` (default 32 KB). Oversized arguments are not run and
+the model is told why; an oversized result is replaced by an error the model sees. For an `execute` tool the
+check happens inside its own `ctx.run`, so the big value is never recorded.
+
+**What a run records.** Each `llm-step-N` journals a small `meta` (`model`, `finishReason`, `inputTokens`,
+`outputTokens`, `durationMs`), never the prompt or the reply. The loop returns the same facts as `trace`
+(one entry per step with the tool names asked for) and logs one `ctx.console` line per step, which stays
+silent on replay.
+
+**Configuration.** `readLlmEnv(process.env)` returns `{LLM_BASE_URL, LLM_API_KEY?, MODEL_ID}` and fails with a
+terminal 500 that names the missing setting and never prints a value.
+
+**Testing agents.** `@empyria/restate/testing` exports `fakeCtx` (a journaling `run`, `genericCall`,
+`awakeable`, state and a capturing `console`) and the model-result helpers `textResult`, `toolCallResult`
+and `sequence`, without loading the AI SDK.
 
 Error policy: a tool that fails terminally (rejected or timed-out approval, a callee's
 `TerminalError`, an execute tool out of retries) goes back to the model as an error result,

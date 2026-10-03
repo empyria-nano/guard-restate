@@ -275,3 +275,62 @@ describe('executeTool', () => {
 		})
 	})
 })
+
+describe('tool size caps', () => {
+	const big = (n) => 'x'.repeat(n)
+	const base = { description: 'd', inputSchema: schema }
+
+	test('assertToolSpecs rejects non-positive caps', () => {
+		for (const cap of [0, -1, 1.5, '10']) {
+			expect(() =>
+				assertToolSpecs({ t: { ...base, execute: async () => 1, maxOutputBytes: cap } }),
+			).toThrow(TypeError)
+			expect(() =>
+				assertToolSpecs({ t: { ...base, execute: async () => 1, maxInputBytes: cap } }),
+			).toThrow(TypeError)
+		}
+	})
+
+	test('oversized arguments: the tool is not run and the model is told', async () => {
+		const ctx = fakeCtx()
+		let ran = false
+		const tools = { t: { ...base, execute: async () => ((ran = true), 1), maxInputBytes: 100 } }
+		const output = await executeTool(ctx, call('t', { v: big(500) }), { tools, ...at })
+		expect(ran).toBe(false)
+		expect(ctx.steps).toHaveLength(0)
+		expect(output.type).toBe('error-text')
+		expect(output.value).toContain('over the limit of 100')
+	})
+
+	test('default input cap applies when the tool sets none', async () => {
+		const tools = { t: { ...base, execute: async () => 1 } }
+		const output = await executeTool(fakeCtx(), call('t', { v: big(20_000) }), { tools, ...at })
+		expect(output.type).toBe('error-text')
+	})
+
+	test('oversized result of an execute tool: error to the model, nothing big journaled', async () => {
+		const ctx = fakeCtx()
+		const tools = {
+			t: { ...base, execute: async () => ({ v: big(500) }), maxOutputBytes: 100 },
+		}
+		const output = await executeTool(ctx, call('t'), { tools, ...at })
+		expect(output.type).toBe('error-text')
+		expect(output.value).toContain('over the limit of 100')
+		expect(JSON.stringify(ctx.steps)).not.toContain('xxxxxxxxxx')
+	})
+
+	test('oversized result of a block tool never reaches the model', async () => {
+		const ctx = fakeCtx({ onCall: () => ({ v: big(500) }) })
+		const tools = { t: { ...base, block: 'Svc', handler: 'h', maxOutputBytes: 100 } }
+		const output = await executeTool(ctx, call('t'), { tools, ...at })
+		expect(output.type).toBe('error-text')
+	})
+
+	test('results within the cap pass through', async () => {
+		const tools = { t: { ...base, execute: async () => ({ ok: true }), maxOutputBytes: 100 } }
+		expect(await executeTool(fakeCtx(), call('t'), { tools, ...at })).toEqual({
+			type: 'json',
+			value: { ok: true },
+		})
+	})
+})

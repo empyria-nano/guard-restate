@@ -193,3 +193,164 @@ describe('defineAgent: session memory', () => {
 		expect(journaled).not.toContain('first question')
 	})
 })
+
+describe('defineAgent: tools that depend on the request', () => {
+	const ctxInput = {
+		type: 'object',
+		properties: { prompt: { type: 'string', minLength: 1 }, folder: { type: 'string' } },
+		required: ['prompt', 'folder'],
+	}
+
+	test('a tools function receives the validated request and its tools are used', async () => {
+		const seen = []
+		const model = new MockLanguageModelV4({
+			doGenerate: sequence(
+				toolCallResult([{ toolName: 'where', input: {} }]),
+				textResult('ok'),
+			),
+		})
+		const agent = defineAgent({
+			name: 'A',
+			model,
+			input: ctxInput,
+			tools: (request) => {
+				seen.push(request.folder)
+				return {
+					where: {
+						description: 'Where am I',
+						inputSchema: { type: 'object' },
+						execute: async () => ({ folder: request.folder }),
+					},
+				}
+			},
+		})
+		const ctx = fakeCtx()
+		await agent.service.ask(ctx, { prompt: 'hi', folder: '/f' })
+		expect(seen.length).toBeGreaterThan(0)
+		expect(new Set(seen)).toEqual(new Set(['/f']))
+		expect(ctx.steps.find((s) => s.name.startsWith('tool:where')).result).toEqual({
+			folder: '/f',
+		})
+	})
+
+	test('an invalid tools map for one request fails that request terminally (500)', async () => {
+		const agent = defineAgent({
+			name: 'A',
+			model: okModel(),
+			tools: () => ({ load_skill: { description: 'x', inputSchema: {} } }),
+		})
+		const error = await agent.service.ask(fakeCtx(), { prompt: 'hi' }).catch((e) => e)
+		expect(error).toBeInstanceOf(TerminalError)
+		expect(error.code).toBe(500)
+	})
+})
+
+describe('defineAgent: respond and responseSchema', () => {
+	test('respond shapes the return value from the loop result', async () => {
+		const agent = defineAgent({
+			name: 'A',
+			model: okModel(),
+			respond: (r, input) => ({
+				answer: r.text,
+				steps: r.steps,
+				trace: r.trace.length,
+				echoed: input.prompt,
+			}),
+			responseSchema: { type: 'object', required: ['answer'] },
+		})
+		expect(await agent.service.ask(fakeCtx(), { prompt: 'hi' })).toEqual({
+			answer: 'ok',
+			steps: 1,
+			trace: 1,
+			echoed: 'hi',
+		})
+	})
+
+	test('a response that breaks responseSchema is terminal (500)', async () => {
+		const agent = defineAgent({
+			name: 'A',
+			model: okModel(),
+			respond: () => ({ nope: true }),
+			responseSchema: { type: 'object', required: ['answer'] },
+		})
+		const error = await agent.service.ask(fakeCtx(), { prompt: 'hi' }).catch((e) => e)
+		expect(error).toBeInstanceOf(TerminalError)
+		expect(error.code).toBe(500)
+	})
+
+	test('without respond the default result is unchanged', async () => {
+		expect(
+			await defineAgent({ name: 'A', model: okModel() }).service.ask(fakeCtx(), {
+				prompt: 'hi',
+			}),
+		).toEqual({ text: 'ok', steps: 1 })
+	})
+
+	test('rejects respond or label that is not a function', () => {
+		expect(() => defineAgent({ name: 'A', model: okModel(), respond: 1 })).toThrow(TypeError)
+		expect(() => defineAgent({ name: 'A', model: okModel(), label: 'x' })).toThrow(TypeError)
+	})
+})
+
+describe('defineAgent: label', () => {
+	test('prefixes a terminal failure with the label and keeps its code', async () => {
+		const model = new MockLanguageModelV4({
+			doGenerate: toolCallResult([{ toolName: 'nope', input: {} }]),
+		})
+		const agent = defineAgent({
+			name: 'A',
+			model,
+			limits: { maxSteps: 2 },
+			label: (input) => `job ${input.prompt}`,
+		})
+		const error = await agent.service.ask(fakeCtx(), { prompt: 'J1' }).catch((e) => e)
+		expect(error.constructor).toBe(TerminalError)
+		expect(error.message).toStartWith('[job J1] ')
+		expect(error.message).toContain('maxSteps')
+	})
+
+	test('leaves cancellations and non-terminal errors untouched', async () => {
+		const { CancelledError } = await import('@restatedev/restate-sdk')
+		const cancelled = new CancelledError()
+		const plain = new Error('transient')
+		for (const thrown of [cancelled, plain]) {
+			const model = new MockLanguageModelV4({
+				doGenerate: () => {
+					throw thrown
+				},
+			})
+			const agent = defineAgent({ name: 'A', model, label: () => 'L' })
+			const ctx = fakeCtx()
+			ctx.run = async () => {
+				throw thrown
+			}
+			expect(await agent.service.ask(ctx, { prompt: 'hi' }).catch((e) => e)).toBe(thrown)
+		}
+	})
+})
+
+describe('defineAgent: request size cap', () => {
+	test('refuses a request over limits.maxInputBytes (413), labelled when a label is set', async () => {
+		const agent = defineAgent({
+			name: 'A',
+			model: okModel(),
+			limits: { maxInputBytes: 50 },
+			label: () => 'L',
+		})
+		const error = await agent.service
+			.ask(fakeCtx(), { prompt: 'x'.repeat(200) })
+			.catch((e) => e)
+		expect(error).toBeInstanceOf(TerminalError)
+		expect(error.code).toBe(413)
+		expect(error.message).toStartWith('[L] ')
+	})
+
+	test('has a generous default', async () => {
+		const agent = defineAgent({ name: 'A', model: okModel() })
+		expect((await agent.service.ask(fakeCtx(), { prompt: 'x'.repeat(10_000) })).text).toBe('ok')
+		const error = await agent.service
+			.ask(fakeCtx(), { prompt: 'x'.repeat(70_000) })
+			.catch((e) => e)
+		expect(error.code).toBe(413)
+	})
+})
