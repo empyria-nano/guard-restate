@@ -1,6 +1,6 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.4.24",
+	"version": "0.4.25",
 	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
@@ -26,8 +26,8 @@
 		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
-		"@empyria/classification": "0.1.10",
-		"@empyria/common": "0.3.12",
+		"@empyria/classification": "0.1.11",
+		"@empyria/common": "0.3.13",
 		"@restatedev/pubsub": "0.3.2",
 		"@restatedev/pubsub-client": "0.3.2",
 		"@restatedev/restate-sdk": "1.17.3",
