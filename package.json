@@ -1,6 +1,6 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.4.27",
+	"version": "0.4.28",
 	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
@@ -26,8 +26,8 @@
 		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
-		"@empyria/classification": "0.1.12",
-		"@empyria/common": "0.3.15",
+		"@empyria/classification": "0.1.13",
+		"@empyria/common": "0.3.16",
 		"@restatedev/pubsub": "0.3.2",
 		"@restatedev/pubsub-client": "0.3.2",
 		"@restatedev/restate-sdk": "1.17.4",
@@ -36,10 +36,10 @@
 		"croner": "10.0.1"
 	},
 	"devDependencies": {
-		"@ai-sdk/openai-compatible": "3.0.75",
-		"@ai-sdk/provider": "4.0.31",
+		"@ai-sdk/openai-compatible": "3.0.78",
+		"@ai-sdk/provider": "4.0.34",
 		"@restatedev/restate-server": "1.8.1",
-		"ai": "7.0.148",
+		"ai": "7.0.153",
 		"oxfmt": "0.74.0",
 		"oxlint": "1.89.0"
 	},
