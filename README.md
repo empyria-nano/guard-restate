@@ -81,6 +81,9 @@ endpoint, then create jobs with either:
   starts with the application.** The job has the stable `id` you give it, so calling it on every start never adds a second
   job: the same request changes nothing, and a changed request (another schedule, target or payload) replaces the pending
   run under the same ID. Call it once the endpoint has registered, e.g. from `setupRestate`'s `registrationCallbackFn`.
+- `getCronJob({restateURL, id})`: the job's request and next run, or `null` when it does not exist;
+- `cancelCronJob({restateURL, id})`: cancels the pending run, clears the job and **reads it back**: it resolves only when
+  the job is really gone, and throws otherwise. Safe to repeat, and for a job that never existed.
 
 Cron expressions are `croner` patterns (five fields, or six with seconds for tests). The target handler is sent the
 `payload` as its input, or no input when there is none.

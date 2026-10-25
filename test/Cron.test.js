@@ -3,6 +3,8 @@ import {
 	cronJobInitiator,
 	cronJob,
 	ensureCronJob,
+	getCronJob,
+	cancelCronJob,
 	setJobStateName,
 	JOB_STATE_NAME,
 } from '../lib/Cron.js'
@@ -298,5 +300,48 @@ describe('retry policy', () => {
 		// Omitting the limit (or Infinity) would leave the server default of 70 attempts.
 		expect(RETRY_FOREVER.maxAttempts).toBe(2_147_483_647)
 		expect(cronJob.options?.retryPolicy ?? cronJob.retryPolicy).toBeDefined()
+	})
+})
+
+describe('getCronJob and cancelCronJob', () => {
+	const realFetch = globalThis.fetch
+	afterEach(() => {
+		globalThis.fetch = realFetch
+	})
+	const respond = (script) => {
+		const calls = []
+		globalThis.fetch = async (url) => {
+			calls.push(url)
+			const body = script.shift()
+			return new Response(body === undefined ? '' : JSON.stringify(body), { status: 200 })
+		}
+		return calls
+	}
+
+	test('getCronJob answers null when the job does not exist', async () => {
+		respond([undefined])
+		expect(await getCronJob({ restateURL: 'http://r', id: 'a:1' })).toBeNull()
+	})
+
+	test('cancelCronJob cancels, then reads the job back before it resolves', async () => {
+		const calls = respond([undefined, undefined])
+		await cancelCronJob({ restateURL: 'http://r', id: 'a:1' })
+		expect(calls).toEqual(['http://r/CronJob/a:1/cancel', 'http://r/CronJob/a:1/getInfo'])
+	})
+
+	test('cancelCronJob fails when the job is still there afterwards', async () => {
+		respond([undefined, { request: {} }])
+		expect(cancelCronJob({ restateURL: 'http://r', id: 'a:1' })).rejects.toThrow(
+			'still scheduled',
+		)
+	})
+
+	test('cancelCronJob fails when the cancel call fails', async () => {
+		globalThis.fetch = async () => new Response('', { status: 503, statusText: 'down' })
+		expect(cancelCronJob({ restateURL: 'http://r', id: 'a:1' })).rejects.toThrow('503')
+	})
+
+	test('cancelCronJob refuses an id that cannot be a job id', () => {
+		expect(cancelCronJob({ restateURL: 'http://r', id: 'a b' })).rejects.toThrow(TypeError)
 	})
 })
