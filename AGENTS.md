@@ -115,8 +115,11 @@ recording span and never throw. Keep the journal rule for spans too: attributes 
 names, the validation side), **never** prompt, reply, input or output text. The instrumentation scope (`TRACER_NAME`) is the
 package name by OpenTelemetry convention; who reports is the resource (`OTEL_SERVICE_NAME`), set by whoever deploys.
 
-The OpenTelemetry packages are pinned to the 2.x line (`@opentelemetry/*` 2.12.0, exporter 0.223.0, API 1.9.1); 3.0 is newer
-than the hook's tested range — move all of them together.
+The OpenTelemetry packages are pinned to the 3.x line (`@opentelemetry/*` 3.0.0, exporter 0.300.0, API 1.10.0). Move all of
+them together: each SDK major accepts only its own API minor (`sdk-trace` 3.0 needs API 1.10.x), and `ncu` misses that. 3.0
+replaced `sdk-trace-base` with `sdk-trace`, renamed `BasicTracerProvider` to `TracerProvider`, made the span processors take
+`{ exporter }`, and stopped reading the `OTEL_BSP_*`, sampler and span-limit variables (none are used here). It also calls
+span events deprecated: `addSpanEvent` (the `validation.failed` event) still works, but may need to become an attribute later.
 
 ## Zero-dependency preference
 

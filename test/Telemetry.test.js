@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
+import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace'
 import { MockLanguageModelV4 } from 'ai/test'
 import { TerminalError } from '@restatedev/restate-sdk'
 import { defineObject, defineService, defineWorkflow } from '../lib/Admin.js'
@@ -35,7 +35,7 @@ const attempt = (target = 'Greeter/greet') =>
 
 const tracing = () => {
 	const exporter = new InMemorySpanExporter()
-	startTelemetry({ processor: new SimpleSpanProcessor(exporter) })
+	startTelemetry({ processor: new SimpleSpanProcessor({ exporter }) })
 	return exporter
 }
 
