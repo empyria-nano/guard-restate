@@ -4,7 +4,7 @@ Restate.dev helpers for **Empyria**, a nanoservice framework built primarily on 
 an Admin API client, a dynamic-dispatch service, cron-driven workflow scheduling, and
 schema validation for workflow handlers.
 
-Targets Restate server `1.7.x` and `@restatedev/restate-sdk` `1.17.x` (pinned in `package.json`) —
+Targets Restate server `1.8.x` and `@restatedev/restate-sdk` `1.18.x` (pinned in `package.json`) —
 check both when touching version pins; the SDK's own version numbering runs well ahead of the
 server's, so "latest" is not the right default here.
 
@@ -95,6 +95,28 @@ ports, installs process-wide `SIGTERM`/`SIGINT` handlers, and its returned `forc
 with `CronJobInitiator.create`: it generates a new random job ID on every call, so each restart would add another copy.
 `ensure` compares the normalised request (`cronExpression`, `service`, `method`, `key`, `payload`) and only reschedules
 when it changed. A change here must keep `initiate`, `execute` and `cancel` behaving as before.
+
+## Tracing (`lib/Telemetry.js`)
+
+OpenTelemetry tracing is optional and transparent: a service author does nothing. `withTracing` (used by
+`defineService`/`defineWorkflow`/`defineObject`, so by `defineAgent`, and by the Cron definitions) adds `TRACING_HOOK` —
+Restate's own `openTelemetryHook` from `@restatedev/restate-sdk-opentelemetry`, one instance — before the definition's own
+hooks, **only when** the environment has an OTLP endpoint (`OTEL_EXPORTER_OTLP_ENDPOINT` or `..._TRACES_ENDPOINT`, and not
+`OTEL_SDK_DISABLED=true`) and the definition does not say `tracing: false`. Otherwise the definition is returned as it was
+(without its `tracing` flag): no hook, nothing registered. `serveEndpoint` and `setupRestate` call `startTelemetry` (provider,
+OTLP/HTTP exporter, resource from `OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES`, AsyncLocalStorage context manager) and flush
+on shutdown.
+
+Not through `defaultServiceOptions`: the SDK spreads a service's own `options` over the endpoint defaults, so a service with
+hooks of its own would silently lose the tracing hook (`buildServiceComponent` in the SDK's `endpoint.js`).
+
+`setSpanAttributes`/`addSpanEvent` are what library code uses (validation, the agent loop, tools): they do nothing without a
+recording span and never throw. Keep the journal rule for spans too: attributes are small values (model, token counts, tool
+names, the validation side), **never** prompt, reply, input or output text. The instrumentation scope (`TRACER_NAME`) is the
+package name by OpenTelemetry convention; who reports is the resource (`OTEL_SERVICE_NAME`), set by whoever deploys.
+
+The OpenTelemetry packages are pinned to the 2.x line (`@opentelemetry/*` 2.12.0, exporter 0.223.0, API 1.9.1); 3.0 is newer
+than the hook's tested range — move all of them together.
 
 ## Zero-dependency preference
 

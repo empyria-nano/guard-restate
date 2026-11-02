@@ -51,6 +51,7 @@ import { checkServiceHandler } from '@empyria/restate/lib/Admin.js'
 | [lib/Pubsub.js](./lib/Pubsub.js)         | `definePubsub` (register a pubsub Virtual Object on your endpoint), `pubsubPublisher` (publish into it from inside a handler, in-process), `pubsubClient` (publish/pull/subscribe to it from anywhere else, over the network) — thin wrappers around `@restatedev/pubsub`/`@restatedev/pubsub-client`. |
 | [lib/Validation.js](./lib/Validation.js) | `withValidation` — wraps a workflow handler with input/output JSON schema validation via `@empyria/common`.                                                                                                                                                                                            |
 | [lib/Endpoint.js](./lib/Endpoint.js)     | `serveEndpoint` — serves services/workflows over HTTP/2 without registering itself or deleting its deployment on exit (for a supervisor that registers the address).                                                                                                                                   |
+| [lib/Telemetry.js](./lib/Telemetry.js)   | Optional OpenTelemetry tracing, off unless the environment configures it: `withTracing` (used by the definers), `startTelemetry` (used by `serveEndpoint`/`setupRestate`), and `setSpanAttributes`/`addSpanEvent` for library code. See [Tracing](#tracing).                                           |
 
 ## Agents: `@empyria/restate/agent`
 
@@ -107,6 +108,26 @@ renamed handler cannot resume.
 To serve without registering: when something else owns registration (a supervisor that registers a process's address once and restarts the process), use
 `serveEndpoint({port, services})` instead: it only serves. Invocations already running on a deployment are pinned to its
 address, so the deployment must survive the process stopping and come back at the same address.
+
+### Tracing
+
+OpenTelemetry tracing needs nothing in a service, and is off unless the environment asks for it:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318   # on: OTLP/HTTP, traces to <endpoint>/v1/traces
+OTEL_SERVICE_NAME=HelloService_v1                   # who reports (and OTEL_RESOURCE_ATTRIBUTES for version, revision, ...)
+OTEL_SDK_DISABLED=true                              # off, whatever else is set
+```
+
+When it is on, every definition made with `defineService`/`defineWorkflow`/`defineObject`/`defineAgent` gets Restate's
+`openTelemetryHook` (`@restatedev/restate-sdk-opentelemetry`): a span per handler attempt and per executed `ctx.run`,
+under the trace Restate passes in, so Restate's spans and the service's are one trace. `serveEndpoint` and `setupRestate`
+start the exporter and flush it on shutdown. Agents add OpenTelemetry's GenAI attributes to each model step (model, token
+counts, finish reason) and the tool name to each tool's span; a validation failure is an event with the side. Never
+prompt, reply or payload text.
+
+When it is off (no endpoint), nothing is added or registered: services behave exactly as before. One service can stay
+out while the rest is traced: `defineService({ name, handlers, tracing: false })` (the same for `defineAgent`).
 
 ### Shaping an agent
 

@@ -9,3 +9,5 @@ export * from './lib/Caller.js'
 export * from './lib/Pubsub.js'
 
 export * from './lib/Endpoint.js'
+
+export * from './lib/Telemetry.js'
