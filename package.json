@@ -1,6 +1,6 @@
 {
 	"name": "@empyria/restate",
-	"version": "0.4.34",
+	"version": "0.4.35",
 	"description": "Restate.dev helpers for the Empyria nanoservice framework",
 	"license": "MIT",
 	"author": "Imre Fazekas <imre.fazekas@icloud.com>",
@@ -36,10 +36,10 @@
 		"@opentelemetry/sdk-trace": "3.0.0",
 		"@restatedev/pubsub": "0.3.2",
 		"@restatedev/pubsub-client": "0.3.2",
-		"@restatedev/restate-sdk": "1.18.2",
-		"@restatedev/restate-sdk-clients": "1.18.2",
-		"@restatedev/restate-sdk-core": "1.18.2",
-		"@restatedev/restate-sdk-opentelemetry": "1.18.2",
+		"@restatedev/restate-sdk": "1.18.3",
+		"@restatedev/restate-sdk-clients": "1.18.3",
+		"@restatedev/restate-sdk-core": "1.18.3",
+		"@restatedev/restate-sdk-opentelemetry": "1.18.3",
 		"croner": "11.0.0"
 	},
 	"devDependencies": {
