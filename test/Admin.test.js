@@ -638,7 +638,7 @@ describe('sendMessageAsynSafe', () => {
 // deleteDeployment/registerDeployment (which it composes) are covered above.
 
 describe('defineWorkflow / defineService / defineObject', () => {
-	test('are passthroughs to the underlying restate.* definers', () => {
+	test('make the underlying restate.* definitions', () => {
 		const wf = defineWorkflow({ name: 'Wf', handlers: { run: async () => {} } })
 		expect(wf.name).toBe('Wf')
 

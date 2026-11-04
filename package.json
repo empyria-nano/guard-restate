@@ -43,12 +43,12 @@
 		"croner": "11.0.0"
 	},
 	"devDependencies": {
-		"@ai-sdk/openai-compatible": "3.0.82",
+		"@ai-sdk/openai-compatible": "3.0.84",
 		"@ai-sdk/provider": "4.0.35",
 		"@restatedev/restate-server": "1.8.1",
-		"ai": "7.0.159",
-		"oxfmt": "0.75.0",
-		"oxlint": "1.90.0"
+		"ai": "7.0.162",
+		"oxfmt": "0.76.0",
+		"oxlint": "1.91.0"
 	},
 	"peerDependencies": {
 		"@ai-sdk/openai-compatible": "^3.0.60",

@@ -96,6 +96,27 @@ with `CronJobInitiator.create`: it generates a new random job ID on every call, 
 `ensure` compares the normalised request (`cronExpression`, `service`, `method`, `key`, `payload`) and only reschedules
 when it changed. A change here must keep `initiate`, `execute` and `cancel` behaving as before.
 
+## Published contracts (`withValidation` and `define*`)
+
+A handler's input and output schemas are published to Restate, so a dashboard can read them from the Admin API (`GET
+/services/<name>`: `input_json_schema`, `output_json_schema`, `documentation`) and generate a form. A service author does
+nothing: `withValidation` keeps its schemas on the function it returns (`handlerContract`), and
+`defineService`/`defineWorkflow`/`defineObject` make such a handler into the SDK handler with `new restate.serde.JsonSerde(schema)`
+as its input and output (`withContracts` in `lib/Admin.js`). The same schema objects are enforced and published, so the two
+cannot drift.
+
+- **It describes; it does not enforce.** Checked against Restate 1.8.1: the server accepts `$schema` 2020-12 and refuses nothing
+  because of a published schema, not even an extra field under `additionalProperties: false`. `withValidation` remains the check.
+- **No handler changes kind.** `run` of a workflow is `WORKFLOW`, its other handlers `SHARED`, an object's `EXCLUSIVE`, a
+  service's as for a plain function. `test/Contracts.test.js` pins this through the SDK's real discovery answer: changing a
+  handler's kind would break workflows that are running.
+- **What is left alone:** plain functions, handlers the author wrapped with `restate.handlers.*` (the SDK wraps a copy, so the
+  contract is not on it; such a handler publishes through its own options), and every handler of a definition with its own
+  `serde`, which may not speak JSON.
+- `withValidation`'s fourth argument takes a `description`, published with the handler. A definition's own `description` and
+  `metadata` are passed on as before; `metadata` values must be strings, so a schema does not go there.
+- `defineAgent` builds on `defineService`/`defineObject`, so its `ask` publishes too. The Cron definitions use `restate.object` directly and do not.
+
 ## Tracing (`lib/Telemetry.js`)
 
 OpenTelemetry tracing is optional and transparent: a service author does nothing. `withTracing` (used by
