@@ -8,6 +8,8 @@ import {
 	listServices,
 	queryRestate,
 	deleteDeployment,
+	invocationCommand,
+	clearObjectState,
 	service,
 	listHandlers,
 	submitWorkflow,
@@ -222,6 +224,81 @@ describe('queryRestate', () => {
 		globalThis.fetch = mock(async () => jsonResponse(null, false))
 		await expect(
 			queryRestate({ restateAdminURL: 'http://admin', sql: 'SELECT 1' }),
+		).rejects.toThrow(restate.TerminalError)
+	})
+})
+
+describe('invocationCommand', () => {
+	test('PATCHes /invocations/{id}/{command} and answers done', async () => {
+		globalThis.fetch = mock(async (url, init) => {
+			expect(url).toBe('http://admin/invocations/inv_1/cancel')
+			expect(init.method).toBe('PATCH')
+			return jsonResponse({}, true, 202)
+		})
+		expect(
+			await invocationCommand({
+				restateAdminURL: 'http://admin',
+				invocationId: 'inv_1',
+				command: 'cancel',
+			}),
+		).toBe('done')
+	})
+
+	test('an unknown invocation is missing', async () => {
+		globalThis.fetch = mock(async () => jsonResponse(null, false, 404))
+		expect(
+			await invocationCommand({
+				restateAdminURL: 'http://admin',
+				invocationId: 'inv_1',
+				command: 'kill',
+			}),
+		).toBe('missing')
+	})
+
+	test('409 means completed for cancel/kill and running for purge', async () => {
+		globalThis.fetch = mock(async () => jsonResponse(null, false, 409))
+		const ask = (command) =>
+			invocationCommand({ restateAdminURL: 'http://admin', invocationId: 'inv_1', command })
+		expect(await ask('cancel')).toBe('completed')
+		expect(await ask('kill')).toBe('completed')
+		expect(await ask('purge')).toBe('running')
+	})
+
+	test('throws on other failures and on an unknown command', async () => {
+		globalThis.fetch = mock(async () => jsonResponse(null, false, 503))
+		await expect(
+			invocationCommand({
+				restateAdminURL: 'http://admin',
+				invocationId: 'inv_1',
+				command: 'purge',
+			}),
+		).rejects.toThrow(restate.TerminalError)
+		await expect(
+			invocationCommand({
+				restateAdminURL: 'http://admin',
+				invocationId: 'inv_1',
+				command: 'pause',
+			}),
+		).rejects.toThrow(TypeError)
+	})
+})
+
+describe('clearObjectState', () => {
+	test('POSTs an empty new_state for the key', async () => {
+		globalThis.fetch = mock(async (url, init) => {
+			expect(url).toBe('http://admin/services/AgentQueue/state')
+			expect(JSON.parse(init.body)).toEqual({ object_key: 'k1', new_state: {} })
+			return jsonResponse({}, true, 202)
+		})
+		await expect(
+			clearObjectState({ restateAdminURL: 'http://admin', service: 'AgentQueue', key: 'k1' }),
+		).resolves.toBeUndefined()
+	})
+
+	test('throws on failure', async () => {
+		globalThis.fetch = mock(async () => jsonResponse(null, false, 404))
+		await expect(
+			clearObjectState({ restateAdminURL: 'http://admin', service: 'Nope', key: 'k1' }),
 		).rejects.toThrow(restate.TerminalError)
 	})
 })
