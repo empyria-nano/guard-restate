@@ -96,6 +96,20 @@ with `CronJobInitiator.create`: it generates a new random job ID on every call, 
 `ensure` compares the normalised request (`cronExpression`, `service`, `method`, `key`, `payload`) and only reschedules
 when it changed. A change here must keep `initiate`, `execute` and `cancel` behaving as before.
 
+The object and the initiator are made by factories: `defineCronJob({ name, options, jobStateName })` and
+`defineCronJobInitiator({ name, cronJob })`. `cronJob` and `cronJobInitiator` are their default instances (`CronJob`,
+`CronJobInitiator`) and must stay as they are: consumers register them and have jobs stored under those names.
+
+- **The self-send targets the instance.** `scheduleNextExecution` is handed the definition it runs in and sends `execute`
+  to that, never to the default `cronJob`: two cron objects on one endpoint must not cross.
+- **Options are merged over `{ retryPolicy: RETRY_FOREVER }`**, so only an explicit `retryPolicy` removes the
+  never-give-up policy (a paused invocation would hold the object's lock, see `RETRY_FOREVER`).
+- **State key:** an instance's `jobStateName`, else the module-level `JOB_STATE_NAME` read on every call, so
+  `setJobStateName` still works after the default instance was made.
+- `ensureCronJob`/`getCronJob`/`cancelCronJob` take the object's `name` (default `CronJob`). `ensureCronJob` spreads the
+  rest of its params into the request, so `name` is taken out first. Names are checked by `checkName` (a `TypeError`),
+  since they become a path segment of the ingress URL.
+
 ## Published contracts (`withValidation` and `define*`)
 
 A handler's input and output schemas are published to Restate, so a dashboard can read them from the Admin API (`GET

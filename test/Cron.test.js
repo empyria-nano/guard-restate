@@ -2,6 +2,9 @@ import { afterEach, describe, test, expect } from 'bun:test'
 import {
 	cronJobInitiator,
 	cronJob,
+	defineCronJob,
+	defineCronJobInitiator,
+	RETRY_FOREVER,
 	ensureCronJob,
 	getCronJob,
 	cancelCronJob,
@@ -343,5 +346,249 @@ describe('getCronJob and cancelCronJob', () => {
 
 	test('cancelCronJob refuses an id that cannot be a job id', () => {
 		expect(cancelCronJob({ restateURL: 'http://r', id: 'a b' })).rejects.toThrow(TypeError)
+	})
+})
+
+describe('defineCronJob', () => {
+	const request = { cronExpression: '* * * * *', service: 'ReportService', method: 'refresh' }
+	// Records which object each scheduled run is sent to.
+	const trackSends = (ctx) => {
+		const targets = []
+		ctx.objectSendClient = (definition, key) => {
+			targets.push([definition.name, key])
+			return { execute: () => ({ invocationId: Promise.resolve('exec-inv-1') }) }
+		}
+		return targets
+	}
+
+	test('the default instance is unchanged: CronJob, the same handlers, retry policy and state key', async () => {
+		expect(cronJob.name).toBe('CronJob')
+		expect(Object.keys(cronJob.object).sort()).toEqual([
+			'cancel',
+			'ensure',
+			'execute',
+			'getInfo',
+			'initiate',
+		])
+		expect(cronJob.options).toEqual({ retryPolicy: RETRY_FOREVER })
+
+		const made = defineCronJob()
+		expect(made.name).toBe('CronJob')
+		expect(made.options).toEqual({ retryPolicy: RETRY_FOREVER })
+
+		const ctx = makeSchedulingCtx()
+		const targets = trackSends(ctx)
+		const state = await cronJob.object.initiate(ctx, request)
+		expect(targets).toEqual([['CronJob', 'job-1']])
+		expect(ctx.sets).toEqual([['empyria-job-state', state]])
+	})
+
+	test('a custom name is the name of the definition', () => {
+		const reports = defineCronJob({ name: 'ReportCron' })
+		expect(reports.name).toBe('ReportCron')
+		expect(Object.keys(reports.object).sort()).toEqual(Object.keys(cronJob.object).sort())
+	})
+
+	test('a custom name is where the next run is sent, from initiate, ensure and execute', async () => {
+		const reports = defineCronJob({ name: 'ReportCron' })
+
+		for (const call of [
+			(ctx) => reports.object.initiate(ctx, request),
+			(ctx) => reports.object.ensure(ctx, request),
+		]) {
+			const ctx = makeSchedulingCtx()
+			const targets = trackSends(ctx)
+			await call(ctx)
+			expect(targets).toEqual([['ReportCron', 'job-1']])
+		}
+
+		const ctx = makeSchedulingCtx({ existing: { request } })
+		ctx.genericSend = () => {}
+		const targets = trackSends(ctx)
+		await reports.object.execute(ctx)
+		expect(targets).toEqual([['ReportCron', 'job-1']])
+	})
+
+	test('two cron objects never cross: each sends to itself', async () => {
+		const a = defineCronJob({ name: 'CronA' })
+		const b = defineCronJob({ name: 'CronB' })
+		const ctxA = makeSchedulingCtx()
+		const ctxB = makeSchedulingCtx()
+		const targetsA = trackSends(ctxA)
+		const targetsB = trackSends(ctxB)
+		await a.object.initiate(ctxA, request)
+		await b.object.initiate(ctxB, request)
+		await cronJob.object.initiate(ctxA, request)
+		expect(targetsA).toEqual([
+			['CronA', 'job-1'],
+			['CronJob', 'job-1'],
+		])
+		expect(targetsB).toEqual([['CronB', 'job-1']])
+	})
+
+	test('custom options are merged with the never-give-up retry policy', () => {
+		const made = defineCronJob({ name: 'ReportCron', options: { inactivityTimeout: 60_000 } })
+		expect(made.options).toEqual({ retryPolicy: RETRY_FOREVER, inactivityTimeout: 60_000 })
+	})
+
+	test('an explicit retryPolicy wins', () => {
+		const retryPolicy = { maxAttempts: 3, onMaxAttempts: 'kill' }
+		const made = defineCronJob({ options: { retryPolicy, inactivityTimeout: 60_000 } })
+		expect(made.options).toEqual({ retryPolicy, inactivityTimeout: 60_000 })
+		// The default instance is not touched by another instance's options.
+		expect(cronJob.options).toEqual({ retryPolicy: RETRY_FOREVER })
+	})
+
+	test('jobStateName is the state key of that instance only', async () => {
+		const reports = defineCronJob({ name: 'ReportCron', jobStateName: 'report-job' })
+		const keys = []
+		const ctx = makeSchedulingCtx()
+		ctx.get = async (key) => {
+			keys.push(key)
+			return undefined
+		}
+		const state = await reports.object.initiate(ctx, request)
+		expect(keys).toEqual(['report-job'])
+		expect(ctx.sets).toEqual([['report-job', state]])
+
+		const read = []
+		await reports.object.getInfo({ get: async (key) => read.push(key) })
+		await cronJob.object.getInfo({ get: async (key) => read.push(key) })
+		expect(read).toEqual(['report-job', 'empyria-job-state'])
+	})
+
+	test('without a jobStateName the module-level name is read on every call', async () => {
+		const made = defineCronJob({ name: 'ReportCron' })
+		const read = []
+		const ctx = { get: async (key) => read.push(key) }
+		try {
+			setJobStateName('renamed-state')
+			await made.object.getInfo(ctx)
+			await cronJob.object.getInfo(ctx)
+		} finally {
+			setJobStateName('empyria-job-state')
+		}
+		await cronJob.object.getInfo(ctx)
+		expect(read).toEqual(['renamed-state', 'renamed-state', 'empyria-job-state'])
+	})
+
+	test('a name that cannot be a Restate object name, or an empty state key, is refused', () => {
+		for (const name of ['', 'a/b', 'a b', '1abc', 3, null]) {
+			expect(() => defineCronJob({ name })).toThrow(TypeError)
+		}
+		for (const jobStateName of ['', 3, null]) {
+			expect(() => defineCronJob({ jobStateName })).toThrow(TypeError)
+		}
+	})
+})
+
+describe('defineCronJobInitiator', () => {
+	const makeCtx = () => {
+		const targets = []
+		return {
+			targets,
+			rand: { uuidv4: () => 'job-uuid-1' },
+			objectClient: (definition, key) => {
+				targets.push([definition.name, key])
+				return { initiate: async () => ({ next_execution_time: 'SOME_TIME' }) }
+			},
+		}
+	}
+
+	test('the default instance is CronJobInitiator and creates jobs on CronJob', async () => {
+		expect(cronJobInitiator.name).toBe('CronJobInitiator')
+		expect(defineCronJobInitiator().name).toBe('CronJobInitiator')
+		const ctx = makeCtx()
+		await cronJobInitiator.service.create(ctx, { cronExpression: '* * * * *' })
+		expect(ctx.targets).toEqual([['CronJob', 'job-uuid-1']])
+	})
+
+	test('a custom name and cron object are used', async () => {
+		const reports = defineCronJob({ name: 'ReportCron' })
+		const initiator = defineCronJobInitiator({ name: 'ReportCronInitiator', cronJob: reports })
+		expect(initiator.name).toBe('ReportCronInitiator')
+		const ctx = makeCtx()
+		const result = await initiator.service.create(ctx, { cronExpression: '* * * * *' })
+		expect(ctx.targets).toEqual([['ReportCron', 'job-uuid-1']])
+		expect(result).toContain('job-uuid-1')
+	})
+
+	test('a bad name or cron object is refused', () => {
+		expect(() => defineCronJobInitiator({ name: 'a/b' })).toThrow(TypeError)
+		expect(() => defineCronJobInitiator({ cronJob: {} })).toThrow(TypeError)
+		expect(() => defineCronJobInitiator({ cronJob: null })).toThrow(TypeError)
+	})
+})
+
+describe('the ingress helpers and the cron object name', () => {
+	const realFetch = globalThis.fetch
+	afterEach(() => {
+		globalThis.fetch = realFetch
+	})
+	const record = (script = []) => {
+		const calls = []
+		globalThis.fetch = async (url, init) => {
+			calls.push([url, init.body === undefined ? undefined : JSON.parse(init.body)])
+			const body = script.shift()
+			return new Response(body === undefined ? '' : JSON.stringify(body), { status: 200 })
+		}
+		return calls
+	}
+	const request = { cronExpression: '* * * * *', service: 'ReportService', method: 'refresh' }
+
+	test('ensureCronJob sends to the given name and keeps the name out of the request', async () => {
+		const calls = record([{ next_execution_time: 'T' }])
+		await ensureCronJob({ restateURL: 'http://r', id: 'a:1', name: 'ReportCron', ...request })
+		expect(calls).toEqual([['http://r/ReportCron/a:1/ensure', request]])
+	})
+
+	test('ensureCronJob sends to CronJob by default', async () => {
+		const calls = record([{ next_execution_time: 'T' }])
+		await ensureCronJob({ restateURL: 'http://r', id: 'a:1', ...request, key: 'k', payload: 1 })
+		expect(calls).toEqual([
+			['http://r/CronJob/a:1/ensure', { ...request, key: 'k', payload: 1 }],
+		])
+	})
+
+	test('getCronJob asks the given name, and CronJob by default', async () => {
+		const calls = record([{ request }, { request }])
+		expect(await getCronJob({ restateURL: 'http://r', id: 'a:1', name: 'ReportCron' })).toEqual(
+			{
+				request,
+			},
+		)
+		await getCronJob({ restateURL: 'http://r', id: 'a:1' })
+		expect(calls.map(([url]) => url)).toEqual([
+			'http://r/ReportCron/a:1/getInfo',
+			'http://r/CronJob/a:1/getInfo',
+		])
+	})
+
+	test('cancelCronJob cancels and reads back on the given name, and on CronJob by default', async () => {
+		const calls = record()
+		await cancelCronJob({ restateURL: 'http://r', id: 'a:1', name: 'ReportCron' })
+		await cancelCronJob({ restateURL: 'http://r', id: 'a:1' })
+		expect(calls.map(([url]) => url)).toEqual([
+			'http://r/ReportCron/a:1/cancel',
+			'http://r/ReportCron/a:1/getInfo',
+			'http://r/CronJob/a:1/cancel',
+			'http://r/CronJob/a:1/getInfo',
+		])
+	})
+
+	test('a name that is not safe in a URL path throws a TypeError and nothing is sent', async () => {
+		const calls = record()
+		for (const name of ['', 'a/b', 'a b', 'a?b', '../x', 3, null]) {
+			await expect(
+				ensureCronJob({ restateURL: 'http://r', id: 'a:1', name, ...request }),
+			).rejects.toThrow(TypeError)
+			await expect(getCronJob({ restateURL: 'http://r', id: 'a:1', name })).rejects.toThrow(
+				TypeError,
+			)
+			await expect(
+				cancelCronJob({ restateURL: 'http://r', id: 'a:1', name }),
+			).rejects.toThrow(TypeError)
+		}
+		expect(calls).toEqual([])
 	})
 })

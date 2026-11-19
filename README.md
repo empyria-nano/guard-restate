@@ -73,18 +73,51 @@ bun add ai @ai-sdk/openai-compatible @ai-sdk/provider
 
 ### Recurring jobs
 
-`cronJob` (a virtual object) runs a target handler on a cron schedule: each run sends the target, then schedules the
-next one from the current time, so a restart or an outage never causes a backlog of runs. Register `cronJob` on your
-endpoint, then create jobs with either:
+`cronJob` (a virtual object, registered as `CronJob`) runs a target handler on a cron schedule: each run sends the target,
+then schedules the next one from the current time, so a restart or an outage never causes a backlog of runs. Register
+`cronJob` on your endpoint, then create jobs with either:
 
 - `cronJobInitiator.create(request)`: a new job with a random ID each call (good for jobs created by users);
-- `ensureCronJob({restateURL, id, cronExpression, service, method, key?, payload?})`: **idempotent, for code that
+- `ensureCronJob({restateURL, id, name?, cronExpression, service, method, key?, payload?})`: **idempotent, for code that
   starts with the application.** The job has the stable `id` you give it, so calling it on every start never adds a second
   job: the same request changes nothing, and a changed request (another schedule, target or payload) replaces the pending
   run under the same ID. Call it once the endpoint has registered, e.g. from `setupRestate`'s `registrationCallbackFn`.
-- `getCronJob({restateURL, id})`: the job's request and next run, or `null` when it does not exist;
-- `cancelCronJob({restateURL, id})`: cancels the pending run, clears the job and **reads it back**: it resolves only when
-  the job is really gone, and throws otherwise. Safe to repeat, and for a job that never existed.
+- `getCronJob({restateURL, id, name?})`: the job's request and next run, or `null` when it does not exist;
+- `cancelCronJob({restateURL, id, name?})`: cancels the pending run, clears the job and **reads it back**: it resolves only
+  when the job is really gone, and throws otherwise. Safe to repeat, and for a job that never existed.
+
+`name` is the cron object to talk to, `CronJob` when left out.
+
+**A cron object of your own.** `cronJob` is `defineCronJob()`. Call the factory yourself to register the object under
+another name or with other Restate options:
+
+```js
+import { defineCronJob, defineCronJobInitiator, ensureCronJob } from '@empyria/restate'
+
+const reportCron = defineCronJob({
+	name: 'ReportCron', // default 'CronJob'
+	options: { inactivityTimeout: 60_000 }, // Restate object options, merged over { retryPolicy: RETRY_FOREVER }
+	jobStateName: 'report-job', // state key, default 'empyria-job-state'
+})
+const reportCronInitiator = defineCronJobInitiator({
+	name: 'ReportCronInitiator',
+	cronJob: reportCron,
+})
+
+// register reportCron (and reportCronInitiator) on the endpoint, then:
+await ensureCronJob({
+	restateURL,
+	name: 'ReportCron',
+	id: 'reports:refresh',
+	cronExpression,
+	service,
+	method,
+})
+```
+
+The never-give-up retry policy (`RETRY_FOREVER`) stays unless `options.retryPolicy` replaces it. Each cron object
+schedules its runs on itself, so several may share an endpoint. A job lives on the object it was created on: `name` in
+`ensureCronJob`/`getCronJob`/`cancelCronJob` must be that object's name, and renaming an object does not move its jobs.
 
 Cron expressions are `croner` patterns (five fields, or six with seconds for tests). The target handler is sent the
 `payload` as its input, or no input when there is none.
